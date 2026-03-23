@@ -1,0 +1,7 @@
+streamlit
+httpx
+beautifulsoup4
+pandas
+supabase
+python-dotenv
+lxml
