@@ -119,3 +119,52 @@ def reset_db():
         cursor.execute("DELETE FROM api_state")
         cursor.execute("DELETE FROM progress")
         conn.commit()
+
+def get_completed_for_export():
+    """
+    Get all COMPLETED properties in format ready for Supabase transfer.
+    
+    Returns:
+        List of dictionaries with Supabase schema fields
+    """
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, slug, web_url, title, type, location, address, 
+                   bedroom, bathroom, price, discovered_at, scraped_at, status
+            FROM properties 
+            WHERE status = 'COMPLETED'
+            ORDER BY discovered_at DESC
+        """)
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'slug': row[1],
+                'web_url': row[2],
+                'title': row[3],
+                'type': row[4],
+                'location': row[5],
+                'address': row[6],
+                'bedroom': row[7],
+                'bathroom': row[8],
+                'price': int(row[9]) if row[9] else None,
+                'source': 'scraper',
+                'status': row[12] or 'COMPLETED'
+            })
+        
+        return results
+
+def get_pending_count():
+    """Get count of pending properties."""
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM properties WHERE status = 'PENDING'")
+        return cursor.fetchone()[0]
+
+def get_completed_count():
+    """Get count of completed properties."""
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM properties WHERE status = 'COMPLETED'")
+        return cursor.fetchone()[0]

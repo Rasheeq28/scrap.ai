@@ -7,10 +7,12 @@ import os
 # Ensure the project root is in sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scraper.storage import init_db, get_pending, update_property, get_all_data, reset_db, get_state
+from scraper.storage import init_db, get_pending, update_property, get_all_data, reset_db, get_state, get_completed_for_export, get_completed_count
 from scraper.api_fetcher import discover_properties
 from scraper.property_scraper import scrape_property_details
 from scraper.progress_tracker import update_progress, get_last_progress, clear_progress
+from scraper.supabase_client import SupabaseClient
+from scraper.supabase_sync import SupabaseSync
 from utils.logger import setup_logger
 
 logger = setup_logger("admin_panel")
@@ -86,6 +88,91 @@ with col2:
 with col3:
     completed_df = get_all_data()
     st.metric("Successfully Scraped", len(completed_df))
+
+st.divider()
+
+# ============================================================================
+# SUPABASE TRANSFER SECTION
+# ============================================================================
+st.header("📤 Supabase Transfer")
+
+col_sup1, col_sup2 = st.columns([2, 1])
+
+with col_sup1:
+    # Initialize Supabase connection
+    supabase_client = SupabaseClient()
+    
+    # Connection Status
+    if supabase_client.connect():
+        sync = SupabaseSync(supabase_client)
+        sync.refresh_existing_properties()
+        
+        # Get stats
+        completed_properties = get_completed_for_export()
+        new_props, dup_props, prep_stats = sync.prepare_for_transfer(completed_properties)
+        
+        # Display status
+        st.success("✓ Connected to Supabase")
+        
+        # Display counts in expandable section
+        with st.expander("📊 Transfer Preview & Statistics", expanded=False):
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            with col_stat1:
+                st.metric("Ready to Transfer", len(new_props))
+            with col_stat2:
+                st.metric("Already in DB", len(dup_props))
+            with col_stat3:
+                st.metric("Total Completed", len(completed_properties))
+            
+            st.divider()
+            
+            # Show sync report
+            st.write(sync.get_sync_report(
+                completed_properties, new_props, 
+                [p for p in completed_properties if p in dup_props],
+                dup_props
+            ))
+            
+            # Show sample data
+            if new_props:
+                st.write("**Sample of properties to transfer (first 5):**")
+                sample_df = pd.DataFrame(new_props[:5])
+                st.dataframe(sample_df, use_container_width=True)
+        
+        # Transfer button
+        if len(new_props) > 0:
+            if st.button("🚀 Transfer to Supabase", use_container_width=True, type="primary"):
+                with st.spinner("Transferring data to Supabase..."):
+                    try:
+                        success_count, error_count, errors = supabase_client.upsert_properties(new_props)
+                        
+                        if success_count > 0:
+                            st.success(f"✓ Successfully transferred {success_count} properties to Supabase!")
+                            st.info(f"📊 These properties are now available in the Real_estate table")
+                        
+                        if error_count > 0:
+                            st.error(f"✗ {error_count} properties failed to transfer")
+                            with st.expander("Error Details"):
+                                for error in errors:
+                                    st.error(error)
+                    except Exception as e:
+                        st.error(f"✗ Transfer failed: {str(e)}")
+        else:
+            st.info("✓ All completed properties are already in Supabase. No new data to transfer.")
+        
+        # View sync status
+        with st.expander("🔄 Sync Status & Information"):
+            summary = supabase_client.get_summary()
+            st.write(f"**URL**: {summary['url']}")
+            st.write(f"**User ID**: {summary['user_id']}")
+            st.write(f"**Total Rows in Supabase**: {summary['row_count']}")
+            if summary['last_sync']:
+                st.write(f"**Last Update**: {summary['last_sync']}")
+    else:
+        st.error("✗ Failed to connect to Supabase. Check your credentials in .env")
+        st.info("Required environment variables: SUPABASE_URL, SUPABASE_KEY, SUPABASE_USER_ID")
+
+st.divider()
 
 # Progress Area
 if st.session_state.scraping_active:
