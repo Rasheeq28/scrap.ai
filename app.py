@@ -122,7 +122,7 @@ if SUPABASE_AVAILABLE:
                     st.info("📭 No completed properties to transfer yet. Start scraping to see data here.")
                 else:
                     try:
-                        new_props, dup_props, prep_stats = sync.prepare_for_transfer(completed_properties)
+                        new_props, prep_stats = sync.prepare_for_transfer(completed_properties)
                         
                         # Display status
                         st.success("✓ Connected to Supabase")
@@ -131,19 +131,19 @@ if SUPABASE_AVAILABLE:
                         with st.expander("📊 Transfer Preview & Statistics", expanded=False):
                             col_stat1, col_stat2, col_stat3 = st.columns(3)
                             with col_stat1:
-                                st.metric("Ready to Transfer", len(new_props))
+                                st.metric("Ready to Transfer", prep_stats['ready_to_transfer'])
                             with col_stat2:
-                                st.metric("Already in DB", len(dup_props))
+                                st.metric("Already in DB", prep_stats['duplicates_supabase'])
                             with col_stat3:
-                                st.metric("Total Completed", len(completed_properties))
+                                st.metric("Total Completed", prep_stats['total_local'])
                             
                             st.divider()
                             
-                            # Show sync report
+                            # Show sync report (use counts from prep_stats)
                             st.write(sync.get_sync_report(
                                 completed_properties, new_props, 
-                                [p for p in completed_properties if p in dup_props],
-                                dup_props
+                                [],  # duplicates_in_batch (reconstructed from prep_stats)
+                                []  # duplicates_in_supabase (reconstructed from prep_stats)
                             ))
                             
                             # Show sample data
