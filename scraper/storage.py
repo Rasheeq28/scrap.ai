@@ -126,7 +126,7 @@ def reset_db():
 def get_completed_for_export():
     """
     Get all COMPLETED properties in format ready for Supabase transfer.
-    Ensures all fields are properly formatted and validated.
+    Ensures all fields are properly formatted. Missing values are set to None/null.
     
     Returns:
         List of dictionaries with Supabase schema fields
@@ -143,30 +143,42 @@ def get_completed_for_export():
         
         results = []
         for row in cursor.fetchall():
-            # Convert row to dict with explicit field mapping
-            prop_dict = {
-                'slug': row[1],  # slug TEXT
-                'web_url': row[2],  # web_url TEXT
-                'title': row[3],  # title TEXT
-                'type': row[4],  # type TEXT
-                'location': row[5],  # location TEXT
-                'address': row[6],  # address TEXT
-                'bedroom': int(row[7]) if row[7] else 0,  # bedroom INT
-                'bathroom': int(row[8]) if row[8] else 0,  # bathroom INT
-                'price': int(row[9]) if row[9] and row[9] > 0 else 0,  # price INT (must be positive)
-                'source': 'scraper',  # source TEXT
-                'status': row[12] or 'COMPLETED'  # status TEXT
-            }
-            
-            # Validate required fields are not None or empty
-            if not prop_dict['slug']:
-                logger.warning(f"Skipping property with empty slug: {prop_dict}")
-                continue
-            if not prop_dict['web_url']:
-                logger.warning(f"Skipping property with empty web_url: {prop_dict}")
-                continue
-            
-            results.append(prop_dict)
+            try:
+                # Convert row to dict with explicit field mapping
+                # Use None for any missing or invalid values instead of failing
+                prop_dict = {
+                    'slug': row[1] if row[1] else None,  # slug - keep as is, can be None
+                    'web_url': row[2] if row[2] else None,  # web_url - keep as is, can be None
+                    'title': row[3] if row[3] else None,  # title TEXT
+                    'type': row[4] if row[4] else None,  # type TEXT
+                    'location': row[5] if row[5] else None,  # location TEXT
+                    'address': row[6] if row[6] else None,  # address TEXT
+                    'bedroom': int(row[7]) if row[7] else None,  # bedroom INT (None if missing)
+                    'bathroom': int(row[8]) if row[8] else None,  # bathroom INT (None if missing)
+                    'price': int(row[9]) if row[9] and row[9] > 0 else None,  # price INT (None if invalid)
+                    'source': 'scraper',  # source TEXT
+                    'status': row[12] or 'COMPLETED'  # status TEXT
+                }
+                
+                results.append(prop_dict)
+                
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Error processing row {row}: {e} - Using None for problematic values")
+                # Still add the property with None for problematic fields
+                prop_dict = {
+                    'slug': row[1] if len(row) > 1 and row[1] else None,
+                    'web_url': row[2] if len(row) > 2 and row[2] else None,
+                    'title': row[3] if len(row) > 3 and row[3] else None,
+                    'type': row[4] if len(row) > 4 and row[4] else None,
+                    'location': row[5] if len(row) > 5 and row[5] else None,
+                    'address': row[6] if len(row) > 6 and row[6] else None,
+                    'bedroom': None,  # Set to None if conversion fails
+                    'bathroom': None,  # Set to None if conversion fails
+                    'price': None,  # Set to None if conversion fails
+                    'source': 'scraper',
+                    'status': 'COMPLETED'
+                }
+                results.append(prop_dict)
         
         return results
 

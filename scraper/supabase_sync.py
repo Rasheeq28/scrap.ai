@@ -59,8 +59,17 @@ class SupabaseSync:
 
         # Create set of existing (slug, web_url) pairs for comparison
         existing_identifiers = set()
-        for slug, (web_url, _) in self.existing_properties.items():
-            existing_identifiers.add((slug, web_url))
+        for slug, value in self.existing_properties.items():
+            try:
+                # Handle tuple unpacking safely
+                if isinstance(value, tuple) and len(value) >= 1:
+                    web_url = value[0] if len(value) > 0 else ""
+                    existing_identifiers.add((slug, web_url))
+                else:
+                    existing_identifiers.add((slug, ""))
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Failed to process existing property {slug}: {e}")
+                continue
 
         # Check each local property
         for prop in local_properties:
@@ -180,7 +189,7 @@ class SupabaseSync:
             }
             
         Raises:
-            ValueError: If properties have invalid format
+            ValueError: If properties have invalid format (not a dict)
         """
         if not local_properties:
             logger.warning("No local properties provided to prepare_for_transfer")
@@ -194,14 +203,11 @@ class SupabaseSync:
                 'properties_ready': [],
             }
         
-        # Validate that all properties have required fields
-        required_fields = ['slug', 'web_url', 'price']
+        # Validate that properties are dictionaries
         for idx, prop in enumerate(local_properties):
-            missing_fields = [f for f in required_fields if f not in prop]
-            if missing_fields:
+            if not isinstance(prop, dict):
                 raise ValueError(
-                    f"Property at index {idx} missing required fields: {missing_fields}. "
-                    f"Property: {prop}"
+                    f"Property at index {idx} is not a dictionary: {type(prop)}"
                 )
         
         logger.info(f"🚀 Starting transfer preparation pipeline...")

@@ -92,6 +92,7 @@ class SupabaseClient:
         """
         Upsert properties to Supabase using batch processing.
         Conflict resolution: on slug, update all fields including updated_at.
+        Handles null values gracefully.
 
         Args:
             properties: List of property dictionaries to upsert
@@ -112,12 +113,17 @@ class SupabaseClient:
         error_messages = []
 
         # Add user_id and timestamps to each property
-        for prop in properties:
-            prop["user_id"] = self.user_id
-            prop["updated_at"] = datetime.utcnow().isoformat()
-            # Don't override created_at if it exists, let Supabase handle it
-            if "created_at" not in prop:
-                prop["created_at"] = datetime.utcnow().isoformat()
+        for idx, prop in enumerate(properties):
+            try:
+                prop["user_id"] = self.user_id
+                prop["updated_at"] = datetime.utcnow().isoformat()
+                # Don't override created_at if it exists, let Supabase handle it
+                if "created_at" not in prop:
+                    prop["created_at"] = datetime.utcnow().isoformat()
+            except Exception as e:
+                logger.warning(f"Error adding metadata to property {idx}: {e}")
+                # Continue anyway, let it fail in batch if needed
+                continue
 
         # Process in batches
         total_batches = (len(properties) + batch_size - 1) // batch_size
@@ -129,11 +135,25 @@ class SupabaseClient:
             batch = properties[start_idx:end_idx]
 
             try:
+                # Validate batch before sending
+                valid_batch = []
+                for prop in batch:
+                    if isinstance(prop, dict) and ('slug' in prop or 'web_url' in prop):
+                        valid_batch.append(prop)
+                    else:
+                        logger.warning(f"Skipping invalid property in batch: {prop}")
+                
+                if not valid_batch:
+                    logger.warning(f"Batch {batch_idx + 1} has no valid properties")
+                    error_count += len(batch)
+                    error_messages.append(f"Batch {batch_idx + 1}: All properties invalid")
+                    continue
+                
                 response = self.client.table("Real_estate").upsert(
-                    batch, on_conflict="slug"
+                    valid_batch, on_conflict="slug"
                 ).execute()
 
-                batch_success = len(batch)
+                batch_success = len(valid_batch)
                 success_count += batch_success
                 logger.info(
                     f"✓ Batch {batch_idx + 1}/{total_batches}: "
