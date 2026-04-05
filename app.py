@@ -60,7 +60,7 @@ with st.sidebar:
 
     st.divider()
     
-    if st.button("📥 Export to CSV", use_container_width=True):
+    if st.button("📥 Export to CSV", width='stretch'):
         df = get_all_data()
         if not df.empty:
             csv = df.to_csv(index=False)
@@ -150,11 +150,11 @@ if SUPABASE_AVAILABLE:
                             if new_props:
                                 st.write("**Sample of properties to transfer (first 5):**")
                                 sample_df = pd.DataFrame(new_props[:5])
-                                st.dataframe(sample_df, use_container_width=True)
+                                st.dataframe(sample_df, width='stretch')
                         
                         # Transfer button
                         if len(new_props) > 0:
-                            if st.button("🚀 Transfer to Supabase", use_container_width=True, type="primary"):
+                            if st.button("🚀 Transfer to Supabase", width='stretch', type="primary"):
                                 with st.spinner("Transferring data to Supabase..."):
                                     try:
                                         success_count, error_count, errors = supabase_client.upsert_properties(new_props)

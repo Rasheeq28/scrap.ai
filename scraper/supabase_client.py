@@ -162,7 +162,11 @@ class SupabaseClient:
             except Exception as e:
                 batch_error_count = len(batch)
                 error_count += batch_error_count
-                error_msg = f"Batch {batch_idx + 1}: {str(e)}"
+                # Handle both Exception objects and dict error responses
+                if isinstance(e, dict):
+                    error_msg = f"Batch {batch_idx + 1}: {e.get('message', str(e))}"
+                else:
+                    error_msg = f"Batch {batch_idx + 1}: {str(e)}"
                 error_messages.append(error_msg)
                 logger.error(f"✗ {error_msg}")
 
