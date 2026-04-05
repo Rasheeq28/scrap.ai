@@ -177,7 +177,6 @@ if SUPABASE_AVAILABLE:
                         with st.expander("🔄 Sync Status & Information"):
                             summary = supabase_client.get_summary()
                             st.write(f"**URL**: {summary['url']}")
-                            st.write(f"**User ID**: {summary['user_id']}")
                             st.write(f"**Total Rows in Supabase**: {summary['row_count']}")
                             if summary['last_sync']:
                                 st.write(f"**Last Update**: {summary['last_sync']}")
@@ -194,7 +193,7 @@ if SUPABASE_AVAILABLE:
                             st.write("Try checking the logs on Streamlit Cloud for more details.")
             else:
                 st.error("✗ Failed to connect to Supabase. Check your credentials in secrets")
-                st.info("Required secrets: SUPABASE_URL, SUPABASE_KEY, SUPABASE_USER_ID")
+                st.info("Required secrets: SUPABASE_URL, SUPABASE_KEY")
         
         except ValueError as ve:
             st.error(f"❌ Configuration error: {str(ve)}")

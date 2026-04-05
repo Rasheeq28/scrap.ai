@@ -9,7 +9,6 @@
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS "Real_estate" (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    slug TEXT NOT NULL UNIQUE,
     web_url TEXT NOT NULL UNIQUE,
     title TEXT,
     type TEXT,
@@ -18,56 +17,18 @@ CREATE TABLE IF NOT EXISTS "Real_estate" (
     bedroom INTEGER,
     bathroom INTEGER,
     price INTEGER,
-    user_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    source TEXT DEFAULT 'scraper',
-    status TEXT DEFAULT 'COMPLETED',
-    CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- 2. CREATE INDEXES for performance
 -- ============================================================================
-CREATE INDEX IF NOT EXISTS idx_real_estate_slug ON "Real_estate"(slug);
 CREATE INDEX IF NOT EXISTS idx_real_estate_web_url ON "Real_estate"(web_url);
-CREATE INDEX IF NOT EXISTS idx_real_estate_user_id ON "Real_estate"(user_id);
 CREATE INDEX IF NOT EXISTS idx_real_estate_location ON "Real_estate"(location);
 CREATE INDEX IF NOT EXISTS idx_real_estate_created_at ON "Real_estate"(created_at);
 CREATE INDEX IF NOT EXISTS idx_real_estate_updated_at ON "Real_estate"(updated_at);
 
--- 3. ENABLE ROW LEVEL SECURITY (RLS)
--- ============================================================================
-ALTER TABLE "Real_estate" ENABLE ROW LEVEL SECURITY;
-
--- 4. CREATE RLS POLICIES
--- ============================================================================
-
--- Policy 1: Users can only SELECT their own rows
-CREATE POLICY "Users can view their own properties"
-ON "Real_estate"
-FOR SELECT
-USING (auth.uid() = user_id);
-
--- Policy 2: Users can only INSERT rows for themselves
-CREATE POLICY "Users can insert their own properties"
-ON "Real_estate"
-FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
--- Policy 3: Users can only UPDATE their own rows
-CREATE POLICY "Users can update their own properties"
-ON "Real_estate"
-FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
--- Policy 4: Users can only DELETE their own rows
-CREATE POLICY "Users can delete their own properties"
-ON "Real_estate"
-FOR DELETE
-USING (auth.uid() = user_id);
-
--- 5. CREATE TRIGGER for automatic updated_at timestamp
+-- 3. CREATE TRIGGER for automatic updated_at timestamp
 -- ============================================================================
 CREATE OR REPLACE FUNCTION update_real_estate_timestamp()
 RETURNS TRIGGER AS $$
@@ -95,7 +56,7 @@ EXECUTE FUNCTION update_real_estate_timestamp();
 -- Check if table is created:
 -- SELECT * FROM information_schema.tables WHERE table_name='Real_estate';
 
--- Check if RLS is enabled:
+-- Check if RLS is disabled:
 -- SELECT relname, relrowsecurity FROM pg_class WHERE relname='Real_estate';
 
 -- Check indexes:

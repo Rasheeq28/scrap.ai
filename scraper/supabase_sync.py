@@ -26,14 +26,14 @@ class SupabaseSync:
             supabase_client: SupabaseClient instance (must be connected)
         """
         self.supabase_client = supabase_client
-        self.existing_properties = {}
+        self.existing_properties = {}  # Now maps web_url -> id
 
-    def refresh_existing_properties(self) -> Dict[str, Tuple[str, str]]:
+    def refresh_existing_properties(self) -> Dict[str, str]:
         """
         Fetch current properties from Supabase.
 
         Returns:
-            Dict mapping slug -> (web_url, id)
+            Dict mapping web_url -> id
         """
         self.existing_properties = self.supabase_client.get_existing_properties()
         return self.existing_properties
@@ -57,26 +57,11 @@ class SupabaseSync:
         new_properties = []
         duplicate_properties = []
 
-        # Create set of existing (slug, web_url) pairs for comparison
-        existing_identifiers = set()
-        for slug, value in self.existing_properties.items():
-            try:
-                # Handle tuple unpacking safely
-                if isinstance(value, tuple) and len(value) >= 1:
-                    web_url = value[0] if len(value) > 0 else ""
-                    existing_identifiers.add((slug, web_url))
-                else:
-                    existing_identifiers.add((slug, ""))
-            except (TypeError, ValueError) as e:
-                logger.warning(f"Failed to process existing property {slug}: {e}")
-                continue
-
         # Check each local property
         for prop in local_properties:
-            slug = prop.get("slug", "")
             web_url = prop.get("web_url", "")
 
-            if (slug, web_url) in existing_identifiers:
+            if web_url in self.existing_properties:
                 duplicate_properties.append(prop)
             else:
                 new_properties.append(prop)
@@ -98,7 +83,7 @@ class SupabaseSync:
         self, properties: List[Dict]
     ) -> Tuple[List[Dict], List[Dict], Dict]:
         """
-        Identify duplicates within a batch of properties (matching by slug or web_url).
+        Identify duplicates within a batch of properties (matching by web_url).
 
         Args:
             properties: List of property dicts to check for duplicates
@@ -109,32 +94,23 @@ class SupabaseSync:
         unique_properties = []
         duplicate_properties = []
 
-        # Track seen identifiers
-        seen_slugs = set()
+        # Track seen URLs
         seen_urls = set()
-        slug_to_prop = {}  # Track first occurrence of each slug
 
         # First pass: identify duplicates
         for prop in properties:
-            slug = prop.get("slug", "")
             web_url = prop.get("web_url", "")
 
             is_duplicate = False
 
-            # Check if this slug already seen
-            if slug and slug in seen_slugs:
-                is_duplicate = True
             # Check if this URL already seen
-            elif web_url and web_url in seen_urls:
+            if web_url and web_url in seen_urls:
                 is_duplicate = True
 
             if is_duplicate:
                 duplicate_properties.append(prop)
             else:
                 unique_properties.append(prop)
-                if slug:
-                    seen_slugs.add(slug)
-                    slug_to_prop[slug] = prop
                 if web_url:
                     seen_urls.add(web_url)
 
@@ -153,7 +129,7 @@ class SupabaseSync:
 
     def remove_duplicates(self, properties: List[Dict]) -> List[Dict]:
         """
-        Remove duplicates from a batch, keeping first occurrence of each slug.
+        Remove duplicates from a batch, keeping first occurrence of each web_url.
 
         Args:
             properties: List of property dicts

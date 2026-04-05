@@ -18,30 +18,21 @@ class SupabaseClient:
     Manages Supabase connection and operations for real estate properties.
     """
 
-    def __init__(self, url: Optional[str] = None, key: Optional[str] = None, user_id: Optional[str] = None):
+    def __init__(self, url: Optional[str] = None, key: Optional[str] = None):
         """
         Initialize Supabase client.
 
         Args:
             url: Supabase project URL (defaults to SUPABASE_URL from secrets)
             key: Supabase API key (defaults to SUPABASE_KEY from secrets)
-            user_id: User ID for RLS (defaults to SUPABASE_USER_ID from secrets)
         """
         self.url = url or get_secret("SUPABASE_URL")
         self.key = key or get_secret("SUPABASE_KEY")
-        self.user_id = user_id or get_secret("SUPABASE_USER_ID")
 
         if not self.url or not self.key:
             raise ValueError(
                 "SUPABASE_URL and SUPABASE_KEY must be set in secrets or environment variables"
             )
-
-        if not self.user_id:
-            logger.warning(
-                "SUPABASE_USER_ID not set. Using empty string. "
-                "Recommend setting this for proper user isolation."
-            )
-            self.user_id = ""
 
         self.client: Optional[Client] = None
         self.connected = False
@@ -65,21 +56,21 @@ class SupabaseClient:
             self.connected = False
             return False
 
-    def get_existing_properties(self) -> Dict[str, Tuple[str, str]]:
+    def get_existing_properties(self) -> Dict[str, str]:
         """
-        Fetch all existing properties for current user from Supabase.
+        Fetch all existing properties from Supabase.
 
         Returns:
-            Dict mapping slug -> (web_url, id) for fast duplicate detection
+            Dict mapping web_url -> id for fast duplicate detection
         """
         if not self.connected:
             raise RuntimeError("Not connected to Supabase. Call connect() first.")
 
         try:
-            response = self.client.table("Real_estate").select("slug,web_url,id").execute()
+            response = self.client.table("Real_estate").select("web_url,id").execute()
             properties = {}
             for row in response.data:
-                properties[row["slug"]] = (row["web_url"], row["id"])
+                properties[row["web_url"]] = row["id"]
             logger.info(f"📊 Fetched {len(properties)} existing properties from Supabase")
             return properties
         except Exception as e:
@@ -91,7 +82,7 @@ class SupabaseClient:
     ) -> Tuple[int, int, List[str]]:
         """
         Upsert properties to Supabase using batch processing.
-        Conflict resolution: on slug, update all fields including updated_at.
+        Conflict resolution: on web_url, update all fields including updated_at.
         Handles null values gracefully.
 
         Args:
@@ -112,10 +103,9 @@ class SupabaseClient:
         error_count = 0
         error_messages = []
 
-        # Add user_id and timestamps to each property
+        # Add timestamps to each property
         for idx, prop in enumerate(properties):
             try:
-                prop["user_id"] = self.user_id
                 prop["updated_at"] = datetime.utcnow().isoformat()
                 # Don't override created_at if it exists, let Supabase handle it
                 if "created_at" not in prop:
@@ -138,7 +128,7 @@ class SupabaseClient:
                 # Validate batch before sending
                 valid_batch = []
                 for prop in batch:
-                    if isinstance(prop, dict) and ('slug' in prop or 'web_url' in prop):
+                    if isinstance(prop, dict) and 'web_url' in prop:
                         valid_batch.append(prop)
                     else:
                         logger.warning(f"Skipping invalid property in batch: {prop}")
@@ -150,7 +140,7 @@ class SupabaseClient:
                     continue
                 
                 response = self.client.table("Real_estate").upsert(
-                    valid_batch, on_conflict="slug"
+                    valid_batch, on_conflict="web_url"
                 ).execute()
 
                 batch_success = len(valid_batch)
@@ -248,7 +238,6 @@ class SupabaseClient:
         summary = {
             "connected": self.connected,
             "url": self.url,
-            "user_id": self.user_id,
             "row_count": self.get_row_count() if self.connected else 0,
             "last_sync": self.get_last_sync_time() if self.connected else None,
         }
