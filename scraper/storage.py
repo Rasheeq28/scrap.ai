@@ -1,6 +1,9 @@
 import sqlite3
 import os
+import logging
 from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "scraper_v1.db")
@@ -123,6 +126,7 @@ def reset_db():
 def get_completed_for_export():
     """
     Get all COMPLETED properties in format ready for Supabase transfer.
+    Ensures all fields are properly formatted and validated.
     
     Returns:
         List of dictionaries with Supabase schema fields
@@ -139,19 +143,30 @@ def get_completed_for_export():
         
         results = []
         for row in cursor.fetchall():
-            results.append({
-                'slug': row[1],
-                'web_url': row[2],
-                'title': row[3],
-                'type': row[4],
-                'location': row[5],
-                'address': row[6],
-                'bedroom': row[7],
-                'bathroom': row[8],
-                'price': int(row[9]) if row[9] else None,
-                'source': 'scraper',
-                'status': row[12] or 'COMPLETED'
-            })
+            # Convert row to dict with explicit field mapping
+            prop_dict = {
+                'slug': row[1],  # slug TEXT
+                'web_url': row[2],  # web_url TEXT
+                'title': row[3],  # title TEXT
+                'type': row[4],  # type TEXT
+                'location': row[5],  # location TEXT
+                'address': row[6],  # address TEXT
+                'bedroom': int(row[7]) if row[7] else 0,  # bedroom INT
+                'bathroom': int(row[8]) if row[8] else 0,  # bathroom INT
+                'price': int(row[9]) if row[9] and row[9] > 0 else 0,  # price INT (must be positive)
+                'source': 'scraper',  # source TEXT
+                'status': row[12] or 'COMPLETED'  # status TEXT
+            }
+            
+            # Validate required fields are not None or empty
+            if not prop_dict['slug']:
+                logger.warning(f"Skipping property with empty slug: {prop_dict}")
+                continue
+            if not prop_dict['web_url']:
+                logger.warning(f"Skipping property with empty web_url: {prop_dict}")
+                continue
+            
+            results.append(prop_dict)
         
         return results
 

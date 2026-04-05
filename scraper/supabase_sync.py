@@ -178,7 +178,32 @@ class SupabaseSync:
                 'ready_to_transfer': int,
                 'properties_ready': List[Dict]
             }
+            
+        Raises:
+            ValueError: If properties have invalid format
         """
+        if not local_properties:
+            logger.warning("No local properties provided to prepare_for_transfer")
+            return [], {
+                'total_local': 0,
+                'after_dedup': 0,
+                'new_only': 0,
+                'duplicates_batch': 0,
+                'duplicates_supabase': 0,
+                'ready_to_transfer': 0,
+                'properties_ready': [],
+            }
+        
+        # Validate that all properties have required fields
+        required_fields = ['slug', 'web_url', 'price']
+        for idx, prop in enumerate(local_properties):
+            missing_fields = [f for f in required_fields if f not in prop]
+            if missing_fields:
+                raise ValueError(
+                    f"Property at index {idx} missing required fields: {missing_fields}. "
+                    f"Property: {prop}"
+                )
+        
         logger.info(f"🚀 Starting transfer preparation pipeline...")
 
         summary = {
