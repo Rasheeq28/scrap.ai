@@ -21,6 +21,9 @@ dist/
 .env.test.local
 .env.production.local
 
+# Streamlit Secrets (SENSITIVE - NEVER COMMIT)
+.streamlit/secrets.toml
+
 # IDE
 .vscode/
 .idea/

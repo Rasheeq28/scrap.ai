@@ -1,0 +1,16 @@
+[theme]
+primaryColor = "#FF6E40"
+backgroundColor = "#F5F5F5"
+secondaryBackgroundColor = "#E0E0E0"
+textColor = "#262730"
+font = "sans serif"
+
+[client]
+showErrorDetails = true
+showWarningOnDirectExecution = true
+
+[logger]
+level = "info"
+
+[client.toolbarMode]
+visibility = "auto"

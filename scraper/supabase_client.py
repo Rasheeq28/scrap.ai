@@ -8,9 +8,7 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import logging
 from supabase import create_client, Client
-from dotenv import load_dotenv
-
-load_dotenv()
+from utils.secrets import get_secret
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +23,17 @@ class SupabaseClient:
         Initialize Supabase client.
 
         Args:
-            url: Supabase project URL (defaults to SUPABASE_URL env var)
-            key: Supabase API key (defaults to SUPABASE_KEY env var)
-            user_id: User ID for RLS (defaults to SUPABASE_USER_ID env var)
+            url: Supabase project URL (defaults to SUPABASE_URL from secrets)
+            key: Supabase API key (defaults to SUPABASE_KEY from secrets)
+            user_id: User ID for RLS (defaults to SUPABASE_USER_ID from secrets)
         """
-        self.url = url or os.getenv("SUPABASE_URL")
-        self.key = key or os.getenv("SUPABASE_KEY")
-        self.user_id = user_id or os.getenv("SUPABASE_USER_ID")
+        self.url = url or get_secret("SUPABASE_URL")
+        self.key = key or get_secret("SUPABASE_KEY")
+        self.user_id = user_id or get_secret("SUPABASE_USER_ID")
 
         if not self.url or not self.key:
             raise ValueError(
-                "SUPABASE_URL and SUPABASE_KEY environment variables must be set"
+                "SUPABASE_URL and SUPABASE_KEY must be set in secrets or environment variables"
             )
 
         if not self.user_id:
