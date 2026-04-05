@@ -207,26 +207,28 @@ class SupabaseClient:
             logger.error(f"✗ Failed to get last sync time: {str(e)}")
             return None
 
-    def delete_property(self, slug: str) -> bool:
+    def get_all_properties(self, limit: int = 1000) -> List[Dict]:
         """
-        Delete a property by slug (for cleanup/maintenance).
+        Fetch all properties from Supabase for display.
 
         Args:
-            slug: Property slug to delete
+            limit: Maximum number of records to fetch (default: 1000)
 
         Returns:
-            True if successful, False otherwise
+            List of property dictionaries
         """
         if not self.connected:
             raise RuntimeError("Not connected to Supabase. Call connect() first.")
 
         try:
-            response = self.client.table("Real_estate").delete().eq("slug", slug).execute()
-            logger.info(f"✓ Deleted property: {slug}")
-            return True
+            response = self.client.table("Real_estate").select(
+                "id,web_url,title,type,location,address,bedroom,bathroom,price,created_at,updated_at"
+            ).order("created_at", desc=True).limit(limit).execute()
+            
+            return response.data
         except Exception as e:
-            logger.error(f"✗ Failed to delete property {slug}: {str(e)}")
-            return False
+            logger.error(f"✗ Failed to fetch properties: {str(e)}")
+            return []
 
     def get_summary(self) -> Dict:
         """

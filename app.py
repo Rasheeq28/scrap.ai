@@ -92,8 +92,22 @@ with col2:
     pending_list = get_pending()
     st.metric("Pending Scrape", len(pending_list))
 with col3:
-    completed_df = get_all_data()
-    st.metric("Successfully Scraped", len(completed_df))
+    # Show Supabase count if available, otherwise local count
+    if SUPABASE_AVAILABLE:
+        try:
+            supabase_client = SupabaseClient()
+            if supabase_client.connect():
+                supabase_count = supabase_client.get_row_count()
+                st.metric("Live Properties (Supabase)", supabase_count)
+            else:
+                completed_df = get_all_data()
+                st.metric("Successfully Scraped", len(completed_df))
+        except:
+            completed_df = get_all_data()
+            st.metric("Successfully Scraped", len(completed_df))
+    else:
+        completed_df = get_all_data()
+        st.metric("Successfully Scraped", len(completed_df))
 
 st.divider()
 
@@ -248,11 +262,62 @@ if st.session_state.scraping_active:
 
 # Data Preview
 st.divider()
-st.header("📊 Scraped Data Overview")
-df = get_all_data()
-if not df.empty:
-    # Reorder columns for better view
-    cols = ['title', 'price', 'type', 'location', 'bedroom', 'bathroom', 'address', 'web_url']
-    st.dataframe(df[cols], use_container_width=True)
+st.header("📊 Live Data Preview")
+
+# Try to show Supabase data first (like stock prices database)
+if SUPABASE_AVAILABLE:
+    try:
+        supabase_client = SupabaseClient()
+        if supabase_client.connect():
+            st.info("📡 Showing live data from Supabase database")
+            
+            # Fetch recent properties from Supabase
+            supabase_data = supabase_client.get_all_properties(limit=100)
+            
+            if supabase_data:
+                # Convert to DataFrame and format
+                df_supabase = pd.DataFrame(supabase_data)
+                
+                # Format timestamps
+                if 'created_at' in df_supabase.columns:
+                    df_supabase['created_at'] = pd.to_datetime(df_supabase['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+                if 'updated_at' in df_supabase.columns:
+                    df_supabase['updated_at'] = pd.to_datetime(df_supabase['updated_at']).dt.strftime('%Y-%m-%d %H:%M')
+                
+                # Reorder columns for better display
+                display_cols = ['title', 'price', 'type', 'location', 'bedroom', 'bathroom', 'address', 'created_at', 'updated_at']
+                available_cols = [col for col in display_cols if col in df_supabase.columns]
+                
+                st.dataframe(df_supabase[available_cols], width='stretch')
+                st.caption(f"Showing {len(df_supabase)} most recent properties from Supabase")
+            else:
+                st.info("No data in Supabase yet. Transfer some properties first.")
+        else:
+            st.warning("Could not connect to Supabase. Showing local data instead.")
+            # Fall back to local data
+            df = get_all_data()
+            if not df.empty:
+                cols = ['title', 'price', 'type', 'location', 'bedroom', 'bathroom', 'address', 'web_url']
+                st.dataframe(df[cols], width='stretch')
+                st.caption("Showing local scraped data (not yet transferred to Supabase)")
+            else:
+                st.info("No data available yet. Start scraping to see results.")
+    except Exception as e:
+        st.error(f"Error loading Supabase data: {str(e)}")
+        # Fall back to local data
+        df = get_all_data()
+        if not df.empty:
+            cols = ['title', 'price', 'type', 'location', 'bedroom', 'bathroom', 'address', 'web_url']
+            st.dataframe(df[cols], width='stretch')
+            st.caption("Showing local scraped data (Supabase connection failed)")
+        else:
+            st.info("No data available yet. Start scraping to see results.")
 else:
-    st.info("No data available yet. Start scraping to see results.")
+    # No Supabase available, show local data
+    df = get_all_data()
+    if not df.empty:
+        cols = ['title', 'price', 'type', 'location', 'bedroom', 'bathroom', 'address', 'web_url']
+        st.dataframe(df[cols], width='stretch')
+        st.caption("Showing local scraped data")
+    else:
+        st.info("No data available yet. Start scraping to see results.")
